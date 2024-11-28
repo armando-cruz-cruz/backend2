@@ -31,16 +31,19 @@ app.get('/api/notes',(request,response) =>{
 })
 
 app.get('/api/notes/:id',(request,response) =>{
-    const id = Number(request.params.id)
-    //console.log('id:',id);
-    const note = notes.find(n => n.id===id)
-    //console.log(note);
-    if (note) {
-        response.json(note)
-    }
-    else {
-        response.status(404).end()
-    }
+    Note.findById(request.params.id)
+        .then( note => {
+            if (note) {
+                response.json(note)
+            }
+            else {
+                response.status(404).end()
+            }
+        })
+        .catch(error => {
+            console.log(error);
+            response.status(400).send({error: 'malformated id'})
+        })
 })
 
 app.delete('/api/notes/:id',(request,response) =>{
@@ -50,13 +53,6 @@ app.delete('/api/notes/:id',(request,response) =>{
     response.status(204).end()
 })
 
-const generatedId = () => {
-    const maxId = notes.length>0
-        ? Math.max(...notes.map(n=>n.id))
-        : 0
-    return maxId+1
-}
-
 app.post('/api/notes',(request,response) =>{
     const body = request.body
     if (!body.content) {
@@ -64,23 +60,24 @@ app.post('/api/notes',(request,response) =>{
             error: 'content missing'
         })
     }
-    const note = {
-        id: generatedId(),
+    const note = new Note( {
         content: body.content,
-        important: Boolean(body.important) || false
-    }
-    notes=notes.concat(note)
-    response.json(note)
+        important: body.important || false
+    })
+    note.save().then(result => response.json(result))
 })
 
 app.put('/api/notes/:id',(request,response) =>{
-    const id = Number(request.params.id)
     const body = request.body
-    const note = notes.find(n => n.id === id)
-    if (!note) return response.status(404).end()
-    const updatedNote={...note,important:body.important}
-    notes=notes.map(n => n.id!==id?n : updatedNote)
-    response.json(updatedNote)
+    const note = {
+        content: body.content,
+        important: body.important
+    }
+    Note.findByIdAndUpdate(request.params.id,note,{new:true})
+        .then(result => {
+            response.json(result)
+        })
+        .catch(error => next(error))
 })
 
 const PORT= process.env.PORT
